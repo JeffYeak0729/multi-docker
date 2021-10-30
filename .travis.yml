@@ -1,0 +1,36 @@
+sudo: required
+language: generic
+
+services:
+  - docker
+
+before_install:
+  - docker build -t jeffyeak/multi-docker -f ./client/Dockerfile.dev ./client
+
+script:
+  - docker run -e CI=true jeffyeak/multi-docker npm test
+
+after_success:
+  - docker build -t jeffyeak/multi-client ./client
+  - docker build -t jeffyeak/multi-nginx ./nginx
+  - docker build -t jeffyeak/multi-server ./server
+  - docker build -t jeffyeak/multi-worker ./worker
+  # Log in to the docker CLI
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_ID" --password-stdin
+  # Take those images and push them to docker hub
+  - docker push jeffyeak/multi-client
+  - docker push jeffyeak/multi-nginx
+  - docker push jeffyeak/multi-server
+  - docker push jeffyeak/multi-worker
+
+deploy:
+  provider: elasticbeanstalk
+  region: 'us-west-1'
+  app: 'multi-docker'
+  env: 'MultiDocker-env-1'
+  bucket_name: 'elasticbeanstalk-us-west-1-645478965927'
+  bucket_path: 'docker-multi'
+  on:
+    branch: main
+  access_key_id: $AWS_ACCESS_KEY
+  secret_access_key: $AWS_SECRET_KEY
